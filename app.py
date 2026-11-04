@@ -63,7 +63,7 @@ init_db()
 
 def send_verification_email(email, token, base_url):
     verify_url = base_url + "verify/" + token
-    http_requests.post(
+    return http_requests.post(
         "https://api.resend.com/emails",
         headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
         json={
@@ -211,11 +211,14 @@ def generate():
             c2.execute("UPDATE users SET verify_token=? WHERE email=?", (token, email))
             conn2.commit()
             conn2.close()
+            resend_error = None
             try:
-                send_verification_email(email, token, request.host_url)
-            except Exception:
-                pass
-            return jsonify({"error": "email_not_verified", "message": "Check your inbox to verify your email."}), 403
+                r = send_verification_email(email, token, request.host_url)
+                if r and r.status_code != 200:
+                    resend_error = r.text
+            except Exception as ex:
+                resend_error = str(ex)
+            return jsonify({"error": "email_not_verified", "resend_debug": resend_error, "message": "Check your inbox to verify your email."}), 403
 
         if week_uses >= FREE_USES and not paid and not is_admin and credits <= 0:
             return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
