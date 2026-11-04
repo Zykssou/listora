@@ -87,7 +87,7 @@ Rules:
 - Description: Tell a story, include social proof language, end with CTA
 - Keywords: Include variations, synonyms, related terms"""
 
-    response = client.models.generate_content(model="gemini-3.8-flash", contents=prompt)
+    response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
     import json
     text = response.text
     start = text.find("{")
