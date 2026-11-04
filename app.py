@@ -10,6 +10,7 @@ app.secret_key = os.getenv("SECRET_KEY", "listora-secret-2026")
 DB_PATH = "/tmp/listora.db"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "").strip().lower()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "listora-admin-2026")
 FREE_USES = 3
 
 def init_db():
@@ -175,6 +176,28 @@ def stats():
     listings = c.fetchone()[0]
     conn.close()
     return jsonify({"users": users, "listings": listings})
+
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+@app.route("/admin")
+def admin():
+    pwd = request.args.get("pwd", "")
+    if pwd != ADMIN_PASSWORD:
+        return render_template("admin_login.html")
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM users")
+    total_users = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM listings")
+    total_listings = c.fetchone()[0]
+    c.execute("SELECT email, uses, paid, created_at FROM users ORDER BY created_at DESC LIMIT 50")
+    users = c.fetchall()
+    c.execute("SELECT email, product_name, created_at FROM listings ORDER BY created_at DESC LIMIT 20")
+    recent = c.fetchall()
+    conn.close()
+    return render_template("admin.html", total_users=total_users, total_listings=total_listings, users=users, recent=recent)
 
 if __name__ == "__main__":
     init_db()
