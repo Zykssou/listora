@@ -141,8 +141,8 @@ def test_api():
         return jsonify({"error": "GEMINI_API_KEY not set"}), 500
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_content(model="gemini-3.8-flash", contents="Say hello in one word")
-        return jsonify({"ok": True, "response": response.text})
+        models = [m.name for m in client.models.list()]
+        return jsonify({"ok": True, "available_models": models})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
