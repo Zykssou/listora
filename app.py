@@ -116,7 +116,7 @@ def increment_uses(email):
 
 def call_gemini(prompt):
     import json, time
-    models_to_try = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-3.1-flash-lite"]
+    models_to_try = ["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-1.5-flash"]
     for model_name in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
         body = {"contents": [{"parts": [{"text": prompt}]}]}
