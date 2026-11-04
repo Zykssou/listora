@@ -45,6 +45,18 @@ def init_db():
         )
     """)
     conn.commit()
+    for col, definition in [
+        ("week_uses", "INTEGER DEFAULT 0"),
+        ("week_key", "TEXT DEFAULT ''"),
+        ("credits", "INTEGER DEFAULT 0"),
+        ("verified", "INTEGER DEFAULT 0"),
+        ("verify_token", "TEXT DEFAULT ''")
+    ]:
+        try:
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+            conn.commit()
+        except Exception:
+            pass
     conn.close()
 
 init_db()
