@@ -174,16 +174,20 @@ def index():
 
 @app.route("/generate", methods=["POST"])
 def generate():
-    data = request.json
-    email = data.get("email", "").strip().lower()
-    product_name = data.get("product_name", "")
-    category = data.get("category", "")
-    features = data.get("features", "")
-    target_audience = data.get("target_audience", "")
-    keywords = data.get("keywords", "")
+    try:
+        data = request.json or {}
+        email = data.get("email", "").strip().lower()
+        product_name = data.get("product_name", "")
+        category = data.get("category", "")
+        features = data.get("features", "")
+        target_audience = data.get("target_audience", "")
+        keywords = data.get("keywords", "")
 
-    if not email or not product_name:
-        return jsonify({"error": "Email and product name are required"}), 400
+        if not email or not product_name:
+            return jsonify({"error": "Email and product name are required"}), 400
+
+    except Exception as e:
+        return jsonify({"error": "Bad request: " + str(e)}), 400
 
     try:
         user = get_or_create_user(email)
@@ -231,7 +235,8 @@ def generate():
         remaining = max(0, FREE_USES - (week_uses + 1)) if not paid else 999
         return jsonify({"success": True, "listing": result, "remaining": remaining, "paid": paid})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        import traceback
+        return jsonify({"error": str(e), "detail": traceback.format_exc()}), 500
 
 @app.route("/test-api")
 def test_api():
