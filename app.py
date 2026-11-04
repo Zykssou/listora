@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, session
-from google import genai
+import requests as http_requests
 import os
 import sqlite3
 from datetime import datetime
@@ -56,9 +56,26 @@ def increment_uses(email):
     conn.commit()
     conn.close()
 
-def generate_listing(product_name, category, features, target_audience, keywords):
-    client = genai.Client(api_key=GEMINI_API_KEY)
+def call_gemini(prompt):
+    import json, time
+    models_to_try = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-3.1-flash-lite"]
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        body = {"contents": [{"parts": [{"text": prompt}]}]}
+        try:
+            r = http_requests.post(url, json=body, timeout=90)
+            if r.status_code == 503:
+                time.sleep(2)
+                continue
+            r.raise_for_status()
+            text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return text, model_name
+        except Exception:
+            time.sleep(1)
+            continue
+    raise Exception("Tous les modèles sont indisponibles. Réessaie dans 1 minute.")
 
+def generate_listing(product_name, category, features, target_audience, keywords):
     prompt = f"""You are an expert Amazon listing copywriter. Generate a complete, optimized Amazon product listing for the following product.
 
 Product Name: {product_name}
@@ -87,20 +104,11 @@ Rules:
 - Description: Tell a story, include social proof language, end with CTA
 - Keywords: Include variations, synonyms, related terms"""
 
-    import json, time
-    models_to_try = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-pro-latest"]
-    last_error = None
-    for model_name in models_to_try:
-        try:
-            response = client.models.generate_content(model=model_name, contents=prompt)
-            text = response.text
-            start = text.find("{")
-            end = text.rfind("}") + 1
-            return json.loads(text[start:end])
-        except Exception as e:
-            last_error = e
-            time.sleep(1)
-    raise last_error
+    import json
+    text, _ = call_gemini(prompt)
+    start = text.find("{")
+    end = text.rfind("}") + 1
+    return json.loads(text[start:end])
 
 @app.route("/")
 def index():
@@ -148,15 +156,8 @@ def test_api():
     if not GEMINI_API_KEY:
         return jsonify({"error": "GEMINI_API_KEY not set"}), 500
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        models_to_try = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-pro-latest"]
-        for model_name in models_to_try:
-            try:
-                response = client.models.generate_content(model=model_name, contents="Say hello in one word")
-                return jsonify({"ok": True, "model": model_name, "response": response.text})
-            except Exception:
-                continue
-        return jsonify({"error": "All models unavailable"}), 503
+        text, model_name = call_gemini("Say hello in one word")
+        return jsonify({"ok": True, "model": model_name, "response": text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
