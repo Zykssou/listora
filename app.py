@@ -270,7 +270,7 @@ def test_api():
     if not GEMINI_API_KEY:
         return jsonify({"error": "GEMINI_API_KEY not set"}), 500
     results = {}
-    for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]:
+    for model_name in ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"]:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
         try:
             r = http_requests.post(url, json={"contents": [{"parts": [{"text": "Say hello"}]}]}, timeout=15)
