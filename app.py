@@ -136,6 +136,18 @@ def generate():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/test-api")
+def test_api():
+    if not GEMINI_API_KEY:
+        return jsonify({"error": "GEMINI_API_KEY not set"}), 500
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content("Say hello in one word")
+        return jsonify({"ok": True, "response": response.text})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/stats")
 def stats():
     conn = sqlite3.connect(DB_PATH)

@@ -193,7 +193,14 @@ async function generate() {
                 keywords: document.getElementById('keywords').value
             })
         });
-        const data = await res.json();
+        let data;
+        try {
+            data = await res.json();
+        } catch(jsonErr) {
+            const text = await res.text().catch(() => 'no response');
+            showError('Erreur serveur (' + res.status + '): ' + text.substring(0, 200));
+            return;
+        }
 
         if (data.error === 'free_limit') {
             showError('Tu as utilisé tes 3 fiches gratuites. <a href="#" style="color:#f97316">Passe en Pro — 19$/mois</a> pour des fiches illimitées.');
