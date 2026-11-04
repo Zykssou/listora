@@ -87,7 +87,7 @@ Rules:
 - Description: Tell a story, include social proof language, end with CTA
 - Keywords: Include variations, synonyms, related terms"""
 
-    response = client.models.generate_content(model="gemini-3.8-flash", contents=prompt)
+    response = client.models.generate_content(model="gemini-flash-latest", contents=prompt)
     import json
     text = response.text
     start = text.find("{")
@@ -141,7 +141,7 @@ def test_api():
         return jsonify({"error": "GEMINI_API_KEY not set"}), 500
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_content(model="gemini-3.8-flash", contents="Say hello in one word")
+        response = client.models.generate_content(model="gemini-flash-latest", contents="Say hello in one word")
         return jsonify({"ok": True, "response": response.text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
