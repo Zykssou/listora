@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verified — Listora</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #fff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 16px; padding: 48px 40px; max-width: 480px; text-align: center; }
+        .icon { font-size: 3rem; margin-bottom: 20px; }
+        h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 12px; }
+        p { color: #aaa; line-height: 1.7; margin-bottom: 28px; }
+        .btn { display: inline-block; background: #f97316; color: #fff; padding: 14px 32px; border-radius: 10px; font-size: 1rem; font-weight: 700; text-decoration: none; }
+        .btn:hover { background: #ea6a0a; }
+    </style>
+</head>
+<body>
+<div class="card">
+    {% if success %}
+    <div class="icon">✅</div>
+    <h1>Email Verified!</h1>
+    <p>Your email has been verified. You can now generate your listings!</p>
+    <a href="/" class="btn">Start Generating →</a>
+    {% else %}
+    <div class="icon">❌</div>
+    <h1>Invalid Link</h1>
+    <p>This verification link is invalid or has already been used. Go back and try again.</p>
+    <a href="/" class="btn">Go Back →</a>
+    {% endif %}
+</div>
+</body>
+</html>

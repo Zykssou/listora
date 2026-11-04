@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, redirect
 import requests as http_requests
 import os
 import sqlite3
+import secrets
 from datetime import datetime
 
 app = Flask(__name__)
@@ -14,6 +15,7 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "listora-admin-2026")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
 STRIPE_PACK_PRICE_ID = os.getenv("STRIPE_PACK_PRICE_ID", "")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 FREE_USES = 3
 
 def init_db():
@@ -28,7 +30,9 @@ def init_db():
             created_at TEXT,
             week_uses INTEGER DEFAULT 0,
             week_key TEXT DEFAULT '',
-            credits INTEGER DEFAULT 0
+            credits INTEGER DEFAULT 0,
+            verified INTEGER DEFAULT 0,
+            verify_token TEXT DEFAULT ''
         )
     """)
     c.execute("""
@@ -44,6 +48,27 @@ def init_db():
     conn.close()
 
 init_db()
+
+def send_verification_email(email, token, base_url):
+    verify_url = base_url + "verify/" + token
+    http_requests.post(
+        "https://api.resend.com/emails",
+        headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+        json={
+            "from": "Listora <onboarding@resend.dev>",
+            "to": [email],
+            "subject": "Verify your email — Listora",
+            "html": f"""
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:40px 20px;">
+                <h1 style="color:#f97316;">Listora</h1>
+                <p style="font-size:1.1rem;">Click the button below to verify your email and start generating listings.</p>
+                <a href="{verify_url}" style="display:inline-block;background:#f97316;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;margin:20px 0;">Verify my email</a>
+                <p style="color:#aaa;font-size:0.85rem;">If you didn't request this, ignore this email.</p>
+            </div>
+            """
+        },
+        timeout=10
+    )
 
 def get_week_key():
     now = datetime.now()
@@ -155,7 +180,22 @@ def generate():
 
         week_uses = user[5] if len(user) > 5 else uses
         credits = user[7] if len(user) > 7 else 0
+        verified = user[8] if len(user) > 8 else 0
         is_admin = ADMIN_EMAIL and email == ADMIN_EMAIL
+
+        if not verified and not is_admin:
+            token = secrets.token_urlsafe(32)
+            conn2 = sqlite3.connect(DB_PATH)
+            c2 = conn2.cursor()
+            c2.execute("UPDATE users SET verify_token=? WHERE email=?", (token, email))
+            conn2.commit()
+            conn2.close()
+            try:
+                send_verification_email(email, token, request.host_url)
+            except Exception:
+                pass
+            return jsonify({"error": "email_not_verified", "message": "Check your inbox to verify your email."}), 403
+
         if week_uses >= FREE_USES and not paid and not is_admin and credits <= 0:
             return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
 
@@ -292,6 +332,18 @@ def upgrade_success():
         except:
             pass
     return render_template("upgrade_success.html")
+
+@app.route("/verify/<token>")
+def verify_email(token):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT email FROM users WHERE verify_token=?", (token,))
+    row = c.fetchone()
+    if row:
+        c.execute("UPDATE users SET verified=1, verify_token='' WHERE verify_token=?", (token,))
+        conn.commit()
+    conn.close()
+    return render_template("verified.html", success=bool(row))
 
 @app.route("/privacy")
 def privacy():
