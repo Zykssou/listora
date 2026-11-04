@@ -246,6 +246,22 @@ def generate():
         import traceback
         return jsonify({"error": str(e), "detail": traceback.format_exc()}), 500
 
+@app.route("/test-resend")
+def test_resend():
+    test_email = request.args.get("email", "test@example.com")
+    r = http_requests.post(
+        "https://api.resend.com/emails",
+        headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+        json={
+            "from": "Listora <onboarding@resend.dev>",
+            "to": [test_email],
+            "subject": "Test",
+            "html": "<p>Test email</p>"
+        },
+        timeout=10
+    )
+    return jsonify({"status": r.status_code, "response": r.json()})
+
 @app.route("/test-api")
 def test_api():
     if not GEMINI_API_KEY:
