@@ -24,7 +24,9 @@ def init_db():
             email TEXT UNIQUE,
             uses INTEGER DEFAULT 0,
             paid INTEGER DEFAULT 0,
-            created_at TEXT
+            created_at TEXT,
+            week_uses INTEGER DEFAULT 0,
+            week_key TEXT DEFAULT ''
         )
     """)
     c.execute("""
@@ -41,24 +43,35 @@ def init_db():
 
 init_db()
 
+def get_week_key():
+    now = datetime.now()
+    return f"{now.year}-W{now.isocalendar()[1]}"
+
 def get_or_create_user(email):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    week_key = get_week_key()
     c.execute("SELECT * FROM users WHERE email=?", (email,))
     user = c.fetchone()
     if not user:
-        c.execute("INSERT INTO users (email, uses, paid, created_at) VALUES (?,0,0,?)",
-                  (email, datetime.now().isoformat()))
+        c.execute("INSERT INTO users (email, uses, paid, created_at, week_uses, week_key) VALUES (?,0,0,?,0,?)",
+                  (email, datetime.now().isoformat(), week_key))
         conn.commit()
         c.execute("SELECT * FROM users WHERE email=?", (email,))
         user = c.fetchone()
+    else:
+        if user[6] != week_key:
+            c.execute("UPDATE users SET week_uses=0, week_key=? WHERE email=?", (week_key, email))
+            conn.commit()
+            c.execute("SELECT * FROM users WHERE email=?", (email,))
+            user = c.fetchone()
     conn.close()
     return user
 
 def increment_uses(email):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("UPDATE users SET uses = uses + 1 WHERE email=?", (email,))
+    c.execute("UPDATE users SET uses = uses + 1, week_uses = week_uses + 1 WHERE email=?", (email,))
     conn.commit()
     conn.close()
 
@@ -138,8 +151,9 @@ def generate():
         uses = user[2]
         paid = user[3]
 
+        week_uses = user[5] if len(user) > 5 else uses
         is_admin = ADMIN_EMAIL and email == ADMIN_EMAIL
-        if uses >= FREE_USES and not paid and not is_admin:
+        if week_uses >= FREE_USES and not paid and not is_admin:
             return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
 
         result = generate_listing(product_name, category, features, target_audience, keywords)
@@ -153,7 +167,7 @@ def generate():
         conn.commit()
         conn.close()
 
-        remaining = max(0, FREE_USES - (uses + 1)) if not paid else 999
+        remaining = max(0, FREE_USES - (week_uses + 1)) if not paid else 999
         return jsonify({"success": True, "listing": result, "remaining": remaining, "paid": paid})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
