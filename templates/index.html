@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Listora — AI Amazon Listing Generator</title>
+    <title>Listora — Générateur de fiches Amazon par IA</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #fff; min-height: 100vh; }
@@ -73,96 +73,96 @@
 <body>
 
 <div class="hero">
-    <div class="badge">✦ AI-powered — No account needed to try</div>
-    <h1>Generate <span>Amazon Listings</span><br>in Seconds</h1>
-    <p>Stop spending hours writing product listings. Listora creates optimized titles, bullet points, and descriptions instantly.</p>
+    <div class="badge">✦ Propulsé par l'IA — Aucun compte requis pour tester</div>
+    <h1>Crée tes <span>fiches Amazon</span><br>en quelques secondes</h1>
+    <p>Stop aux heures perdues à rédiger tes fiches produits. Listora génère des titres, bullets et descriptions optimisés instantanément.</p>
 </div>
 
 <div class="container">
     <div class="stats">
         <div>
             <div class="stat-num" id="stat-listings">0</div>
-            <div class="stat-label">Listings generated</div>
+            <div class="stat-label">Fiches générées</div>
         </div>
         <div>
             <div class="stat-num" id="stat-users">0</div>
-            <div class="stat-label">Sellers using Listora</div>
+            <div class="stat-label">Vendeurs qui utilisent Listora</div>
         </div>
         <div>
             <div class="stat-num">3</div>
-            <div class="stat-label">Free listings</div>
+            <div class="stat-label">Fiches gratuites</div>
         </div>
     </div>
 
     <div class="card">
-        <h2>Generate your listing</h2>
+        <h2>Génère ta fiche produit</h2>
         <div class="form-grid">
             <div class="form-full">
-                <label>Your email <span style="color:#f97316">*</span></label>
-                <input type="email" id="email" placeholder="you@example.com">
+                <label>Ton email <span style="color:#f97316">*</span></label>
+                <input type="email" id="email" placeholder="toi@exemple.com">
             </div>
             <div class="form-full">
-                <label>Product name <span style="color:#f97316">*</span></label>
-                <input type="text" id="product_name" placeholder="e.g. Stainless Steel Water Bottle 32oz">
+                <label>Nom du produit <span style="color:#f97316">*</span></label>
+                <input type="text" id="product_name" placeholder="ex. Gourde Inox 1L Isotherme">
             </div>
             <div>
-                <label>Category</label>
+                <label>Catégorie</label>
                 <select id="category">
-                    <option>Kitchen & Home</option>
-                    <option>Sports & Outdoors</option>
-                    <option>Electronics</option>
-                    <option>Beauty & Personal Care</option>
-                    <option>Clothing & Apparel</option>
-                    <option>Toys & Games</option>
-                    <option>Health & Wellness</option>
-                    <option>Pet Supplies</option>
-                    <option>Office Products</option>
-                    <option>Other</option>
+                    <option>Cuisine & Maison</option>
+                    <option>Sports & Plein air</option>
+                    <option>Électronique</option>
+                    <option>Beauté & Soins</option>
+                    <option>Vêtements & Mode</option>
+                    <option>Jouets & Jeux</option>
+                    <option>Santé & Bien-être</option>
+                    <option>Animaux</option>
+                    <option>Fournitures de bureau</option>
+                    <option>Autre</option>
                 </select>
             </div>
             <div>
-                <label>Target audience</label>
-                <input type="text" id="target_audience" placeholder="e.g. Athletes, gym lovers">
+                <label>Public cible</label>
+                <input type="text" id="target_audience" placeholder="ex. Sportifs, amateurs de gym">
             </div>
             <div class="form-full">
-                <label>Key features (separate with commas)</label>
-                <textarea id="features" placeholder="e.g. BPA-free, keeps cold 24h, leak-proof lid, fits car cup holder"></textarea>
+                <label>Caractéristiques clés (séparées par des virgules)</label>
+                <textarea id="features" placeholder="ex. Sans BPA, garde froid 24h, couvercle anti-fuite, compatible porte-gobelet"></textarea>
             </div>
             <div class="form-full">
-                <label>Main keywords</label>
-                <input type="text" id="keywords" placeholder="e.g. water bottle insulated, sports bottle, gym bottle">
+                <label>Mots-clés principaux</label>
+                <input type="text" id="keywords" placeholder="ex. gourde isotherme, bouteille sport, gourde fitness">
             </div>
         </div>
-        <button class="btn" id="generateBtn" onclick="generate()">⚡ Generate My Listing</button>
-        <p class="free-badge"><span>3 free listings</span> — No credit card required</p>
+        <button class="btn" id="generateBtn" onclick="generate()">⚡ Générer ma fiche</button>
+        <p class="free-badge"><span>3 fiches gratuites</span> — Sans carte bancaire</p>
     </div>
 
     <div class="loading" id="loading">
         <div class="spinner"></div>
-        <p>Generating your optimized listing...</p>
+        <p>Génération de ta fiche en cours...</p>
     </div>
 
     <div class="error-msg" id="errorMsg"></div>
 
     <div id="result">
         <div class="result-card">
-            <h3>Title</h3>
-            <button class="copy-btn" onclick="copy('title-text')">Copy</button>
+            <h3>Titre</h3>
+            <button class="copy-btn" onclick="copy('title-text')">Copier</button>
             <p id="title-text"></p>
         </div>
         <div class="result-card">
-            <h3>Bullet Points</h3>
-            <button class="copy-btn" onclick="copy('bullets-text')">Copy</button>
+            <h3>Points clés</h3>
+            <button class="copy-btn" onclick="copy('bullets-text')">Copier</button>
             <ul id="bullets-text"></ul>
         </div>
         <div class="result-card">
             <h3>Description</h3>
-            <button class="copy-btn" onclick="copy('desc-text')">Copy</button>
+            <button class="copy-btn" onclick="copy('desc-text')">Copier</button>
             <p id="desc-text"></p>
         </div>
         <div class="result-card">
-            <h3>Backend Keywords</h3>
-            <button class="copy-btn" onclick="copy('kw-text')">Copy</button>
+            <h3>Mots-clés backend</h3>
+            <button class="copy-btn" onclick="copy('kw-text')">Copier</button>
             <p id="kw-text"></p>
         </div>
         <div style="text-align:center; margin-top:24px; color:#aaa; font-size:0.9rem" id="remaining-msg"></div>
@@ -173,7 +173,7 @@
 async function generate() {
     const email = document.getElementById('email').value.trim();
     const product_name = document.getElementById('product_name').value.trim();
-    if (!email || !product_name) { showError('Please fill in your email and product name.'); return; }
+    if (!email || !product_name) { showError('Merci de remplir ton email et le nom du produit.'); return; }
 
     document.getElementById('generateBtn').disabled = true;
     document.getElementById('loading').style.display = 'block';
@@ -196,10 +196,10 @@ async function generate() {
         const data = await res.json();
 
         if (data.error === 'free_limit') {
-            showError('You\'ve used your 3 free listings. <a href="#" style="color:#f97316">Upgrade to Pro — $19/month</a> for unlimited listings.');
+            showError('Tu as utilisé tes 3 fiches gratuites. <a href="#" style="color:#f97316">Passe en Pro — 19$/mois</a> pour des fiches illimitées.');
             return;
         }
-        if (!data.success) { showError(data.error || 'Something went wrong. Please try again.'); return; }
+        if (!data.success) { showError(data.error || 'Une erreur est survenue. Réessaie.'); return; }
 
         const l = data.listing;
         document.getElementById('title-text').textContent = l.title;
@@ -211,14 +211,14 @@ async function generate() {
 
         const rem = data.remaining;
         document.getElementById('remaining-msg').innerHTML = rem > 0
-            ? `✅ Listing generated! You have <strong style="color:#f97316">${rem} free listing${rem > 1 ? 's' : ''}</strong> remaining.`
-            : `You've used all free listings. <a href="#" style="color:#f97316">Upgrade to Pro — $19/month</a>`;
+            ? `✅ Fiche générée ! Il te reste <strong style="color:#f97316">${rem} fiche${rem > 1 ? 's' : ''} gratuite${rem > 1 ? 's' : ''}</strong>.`
+            : `Tu as utilisé toutes tes fiches gratuites. <a href="#" style="color:#f97316">Passe en Pro — 19$/mois</a>`;
 
         document.getElementById('result').style.display = 'block';
         document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
         loadStats();
     } catch(e) {
-        showError('Network error. Please try again.');
+        showError('Erreur réseau. Réessaie dans quelques secondes.');
     } finally {
         document.getElementById('generateBtn').disabled = false;
         document.getElementById('loading').style.display = 'none';
