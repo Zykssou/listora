@@ -9,6 +9,7 @@ app.secret_key = os.getenv("SECRET_KEY", "listora-secret-2026")
 
 DB_PATH = "/tmp/listora.db"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "").strip().lower()
 FREE_USES = 3
 
 def init_db():
@@ -134,7 +135,8 @@ def generate():
         uses = user[2]
         paid = user[3]
 
-        if uses >= FREE_USES and not paid:
+        is_admin = ADMIN_EMAIL and email == ADMIN_EMAIL
+        if uses >= FREE_USES and not paid and not is_admin:
             return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
 
         result = generate_listing(product_name, category, features, target_audience, keywords)
