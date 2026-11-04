@@ -168,6 +168,11 @@ Rules:
     end = text.rfind("}") + 1
     return json.loads(text[start:end])
 
+@app.errorhandler(500)
+def handle_500(e):
+    import traceback
+    return jsonify({"error": "Internal error", "detail": traceback.format_exc()}), 500
+
 @app.route("/")
 def index():
     return render_template("index.html")
