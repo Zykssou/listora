@@ -11,6 +11,8 @@ DB_PATH = "/tmp/listora.db"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "").strip().lower()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "listora-admin-2026")
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
 FREE_USES = 3
 
 def init_db():
@@ -176,6 +178,51 @@ def stats():
     listings = c.fetchone()[0]
     conn.close()
     return jsonify({"users": users, "listings": listings})
+
+@app.route("/upgrade")
+def upgrade():
+    email = request.args.get("email", "").strip().lower()
+    if not email or not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
+        return redirect("/")
+    import stripe as stripe_lib
+    stripe_lib.api_key = STRIPE_SECRET_KEY
+    try:
+        session = stripe_lib.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="subscription",
+            customer_email=email,
+            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+            success_url=request.host_url + "upgrade/success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=request.host_url,
+            metadata={"email": email}
+        )
+        return redirect(session.url)
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+
+@app.route("/upgrade/success")
+def upgrade_success():
+    session_id = request.args.get("session_id", "")
+    if session_id and STRIPE_SECRET_KEY:
+        import stripe as stripe_lib
+        stripe_lib.api_key = STRIPE_SECRET_KEY
+        try:
+            session = stripe_lib.checkout.Session.retrieve(session_id)
+            if session.payment_status == "paid":
+                email = (session.metadata.get("email") or session.customer_email or "").lower()
+                if email:
+                    conn = sqlite3.connect(DB_PATH)
+                    c = conn.cursor()
+                    c.execute("SELECT * FROM users WHERE email=?", (email,))
+                    if not c.fetchone():
+                        c.execute("INSERT INTO users (email, uses, paid, created_at) VALUES (?,0,1,?)", (email, datetime.now().isoformat()))
+                    else:
+                        c.execute("UPDATE users SET paid=1 WHERE email=?", (email,))
+                    conn.commit()
+                    conn.close()
+        except:
+            pass
+    return render_template("upgrade_success.html")
 
 @app.route("/privacy")
 def privacy():

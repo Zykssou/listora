@@ -146,6 +146,10 @@
                 <input type="text" id="keywords" data-i18n-placeholder="ph_keywords" placeholder="e.g. water bottle insulated, sports bottle">
             </div>
         </div>
+        <div class="form-full" style="display:flex;align-items:flex-start;gap:10px;margin-top:8px;">
+            <input type="checkbox" id="gdpr" style="width:auto;margin-top:3px;accent-color:#f97316;">
+            <label for="gdpr" style="font-size:0.82rem;color:#aaa;cursor:pointer;" data-i18n="gdpr_label">I agree to the <a href="/privacy" style="color:#f97316;">Privacy Policy</a>. My email is used only to track free usage.</label>
+        </div>
         <button class="btn" id="generateBtn" onclick="generate()" data-i18n="btn_generate">⚡ Generate My Listing</button>
         <p class="free-badge"><span data-i18n="free_badge_span">3 free listings</span> — <span data-i18n="free_badge_txt">No credit card required</span></p>
     </div>
@@ -218,6 +222,8 @@ const T = {
         res_desc: "Description",
         res_kw: "Backend Keywords",
         copy_btn: "Copy",
+        gdpr_label: 'I agree to the <a href="/privacy" style="color:#f97316;">Privacy Policy</a>. My email is used only to track free usage.',
+        err_gdpr: "Please accept the Privacy Policy to continue.",
         err_fill: "Please fill in your email and product name.",
         err_network: "Network error. Please try again in a few seconds.",
         err_limit: 'You\'ve used your 3 free listings. <a href="#" style="color:#f97316">Upgrade to Pro — $19/month</a> for unlimited listings.',
@@ -254,6 +260,8 @@ const T = {
         res_desc: "Description",
         res_kw: "Mots-clés backend",
         copy_btn: "Copier",
+        gdpr_label: 'J\'accepte la <a href="/privacy" style="color:#f97316;">Politique de confidentialité</a>. Mon email sert uniquement à compter mes fiches gratuites.',
+        err_gdpr: "Merci d'accepter la Politique de confidentialité pour continuer.",
         err_fill: "Merci de remplir ton email et le nom du produit.",
         err_network: "Erreur réseau. Réessaie dans quelques secondes.",
         err_limit: 'Tu as utilisé tes 3 fiches gratuites. <a href="#" style="color:#f97316">Passe en Pro — 19$/mois</a> pour des fiches illimitées.',
@@ -290,6 +298,8 @@ const T = {
         res_desc: "Descripción",
         res_kw: "Palabras clave backend",
         copy_btn: "Copiar",
+        gdpr_label: 'Acepto la <a href="/privacy" style="color:#f97316;">Política de Privacidad</a>. Mi email se usa solo para contar fichas gratuitas.',
+        err_gdpr: "Por favor acepta la Política de Privacidad para continuar.",
         err_fill: "Por favor rellena tu email y el nombre del producto.",
         err_network: "Error de red. Inténtalo de nuevo en unos segundos.",
         err_limit: 'Has usado tus 3 fichas gratuitas. <a href="#" style="color:#f97316">Pasa a Pro — $19/mes</a> para fichas ilimitadas.',
@@ -326,6 +336,8 @@ const T = {
         res_desc: "Beschreibung",
         res_kw: "Backend-Keywords",
         copy_btn: "Kopieren",
+        gdpr_label: 'Ich stimme der <a href="/privacy" style="color:#f97316;">Datenschutzerklärung</a> zu. Meine E-Mail wird nur zur Nutzungsverfolgung verwendet.',
+        err_gdpr: "Bitte akzeptiere die Datenschutzerklärung, um fortzufahren.",
         err_fill: "Bitte fülle deine E-Mail und den Produktnamen aus.",
         err_network: "Netzwerkfehler. Bitte versuche es in einigen Sekunden erneut.",
         err_limit: 'Du hast deine 3 kostenlosen Listings genutzt. <a href="#" style="color:#f97316">Upgrade auf Pro — $19/Monat</a> für unbegrenzte Listings.',
@@ -362,6 +374,8 @@ const T = {
         res_desc: "Descrição",
         res_kw: "Palavras-chave backend",
         copy_btn: "Copiar",
+        gdpr_label: 'Concordo com a <a href="/privacy" style="color:#f97316;">Política de Privacidade</a>. Meu email é usado apenas para rastrear o uso gratuito.',
+        err_gdpr: "Por favor aceite a Política de Privacidade para continuar.",
         err_fill: "Por favor preencha seu email e o nome do produto.",
         err_network: "Erro de rede. Tente novamente em alguns segundos.",
         err_limit: 'Você usou suas 3 listagens gratuitas. <a href="#" style="color:#f97316">Upgrade para Pro — $19/mês</a> para listagens ilimitadas.',
@@ -403,6 +417,7 @@ async function generate() {
     const email = document.getElementById('email').value.trim();
     const product_name = document.getElementById('product_name').value.trim();
     if (!email || !product_name) { showError(t.err_fill); return; }
+    if (!document.getElementById('gdpr').checked) { showError(t.err_gdpr); return; }
 
     document.getElementById('generateBtn').disabled = true;
     document.getElementById('loading').style.display = 'block';
@@ -432,7 +447,11 @@ async function generate() {
             return;
         }
 
-        if (data.error === 'free_limit') { showError(t.err_limit); return; }
+        if (data.error === 'free_limit') {
+            const upgradeUrl = '/upgrade?email=' + encodeURIComponent(email);
+            showError(t.err_limit.replace('href="#"', 'href="' + upgradeUrl + '"'));
+            return;
+        }
         if (!data.success) { showError(data.error || t.err_generic); return; }
 
         const l = data.listing;
