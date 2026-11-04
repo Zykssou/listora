@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify, session
-import google.generativeai as genai
+from google import genai
 import os
 import sqlite3
 from datetime import datetime
@@ -57,8 +57,7 @@ def increment_uses(email):
     conn.close()
 
 def generate_listing(product_name, category, features, target_audience, keywords):
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
     prompt = f"""You are an expert Amazon listing copywriter. Generate a complete, optimized Amazon product listing for the following product.
 
@@ -88,7 +87,7 @@ Rules:
 - Description: Tell a story, include social proof language, end with CTA
 - Keywords: Include variations, synonyms, related terms"""
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
     import json
     text = response.text
     start = text.find("{")
@@ -141,9 +140,8 @@ def test_api():
     if not GEMINI_API_KEY:
         return jsonify({"error": "GEMINI_API_KEY not set"}), 500
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content("Say hello in one word")
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        response = client.models.generate_content(model="gemini-2.0-flash", contents="Say hello in one word")
         return jsonify({"ok": True, "response": response.text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
