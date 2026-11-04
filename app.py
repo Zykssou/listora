@@ -133,8 +133,10 @@ def call_gemini(prompt):
             continue
     raise Exception("Tous les modèles sont indisponibles. Réessaie dans 1 minute.")
 
-def generate_listing(product_name, category, features, target_audience, keywords):
-    prompt = f"""You are an expert Amazon listing copywriter. Generate a complete, optimized Amazon product listing for the following product.
+def generate_listing(product_name, category, features, target_audience, keywords, language="en"):
+    lang_map = {"fr": "French", "es": "Spanish", "de": "German", "pt": "Portuguese", "en": "English"}
+    lang_name = lang_map.get(language, "English")
+    prompt = f"""You are an expert product listing copywriter. Generate a complete, optimized product listing in {lang_name} for the following product.
 
 Product Name: {product_name}
 Category: {category}
@@ -187,6 +189,7 @@ def generate():
         features = data.get("features", "")
         target_audience = data.get("target_audience", "")
         keywords = data.get("keywords", "")
+        language = data.get("language", "en")
 
         if not email or not product_name:
             return jsonify({"error": "Email and product name are required"}), 400
@@ -223,7 +226,7 @@ def generate():
         if week_uses >= FREE_USES and not paid and not is_admin and credits <= 0:
             return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
 
-        result = generate_listing(product_name, category, features, target_audience, keywords)
+        result = generate_listing(product_name, category, features, target_audience, keywords, language)
         increment_uses(email)
 
         conn = sqlite3.connect(DB_PATH)
