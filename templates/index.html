@@ -226,7 +226,7 @@ const T = {
         err_gdpr: "Please accept the Privacy Policy to continue.",
         err_fill: "Please fill in your email and product name.",
         err_network: "Network error. Please try again in a few seconds.",
-        err_limit: 'You\'ve used your 3 free listings this week. <a href="#" style="color:#f97316">Upgrade to Pro — $19/month</a> for unlimited listings.',
+        err_limit: 'You\'ve used your 3 free listings this week. <a href="PACK_URL" style="color:#f97316">Buy 10 listings — $4.99</a> or <a href="UPGRADE_URL" style="color:#f97316">Go Pro — $19.99/month</a>',
         err_generic: "Something went wrong. Please try again.",
         remaining: (n) => n > 0 ? `✅ Listing generated! You have <strong style="color:#f97316">${n} free listing${n>1?'s':''}</strong> remaining.` : `You've used all free listings. <a href="#" style="color:#f97316">Upgrade to Pro — $19/month</a>`
     },
@@ -264,7 +264,7 @@ const T = {
         err_gdpr: "Merci d'accepter la Politique de confidentialité pour continuer.",
         err_fill: "Merci de remplir ton email et le nom du produit.",
         err_network: "Erreur réseau. Réessaie dans quelques secondes.",
-        err_limit: 'Tu as utilisé tes 3 fiches gratuites cette semaine. <a href="#" style="color:#f97316">Passe en Pro — 19$/mois</a> pour des fiches illimitées.',
+        err_limit: 'Tu as utilisé tes 3 fiches gratuites cette semaine. <a href="PACK_URL" style="color:#f97316">Acheter 10 fiches — 4,99$</a> ou <a href="UPGRADE_URL" style="color:#f97316">Passer en Pro — 19,99$/mois</a>',
         err_generic: "Une erreur est survenue. Réessaie.",
         remaining: (n) => n > 0 ? `✅ Fiche générée ! Il te reste <strong style="color:#f97316">${n} fiche${n>1?'s':''} gratuite${n>1?'s':''}</strong>.` : `Tu as utilisé toutes tes fiches gratuites. <a href="#" style="color:#f97316">Passe en Pro — 19$/mois</a>`
     },
@@ -302,7 +302,7 @@ const T = {
         err_gdpr: "Por favor acepta la Política de Privacidad para continuar.",
         err_fill: "Por favor rellena tu email y el nombre del producto.",
         err_network: "Error de red. Inténtalo de nuevo en unos segundos.",
-        err_limit: 'Has usado tus 3 fichas gratuitas esta semana. <a href="#" style="color:#f97316">Pasa a Pro — $19/mes</a> para fichas ilimitadas.',
+        err_limit: 'Has usado tus 3 fichas gratuitas esta semana. <a href="PACK_URL" style="color:#f97316">Comprar 10 fichas — $4.99</a> o <a href="UPGRADE_URL" style="color:#f97316">Ir a Pro — $19.99/mes</a>',
         err_generic: "Algo salió mal. Inténtalo de nuevo.",
         remaining: (n) => n > 0 ? `✅ ¡Ficha generada! Te quedan <strong style="color:#f97316">${n} ficha${n>1?'s':''} gratuita${n>1?'s':''}</strong>.` : `Has usado todas tus fichas gratuitas. <a href="#" style="color:#f97316">Pasa a Pro — $19/mes</a>`
     },
@@ -340,7 +340,7 @@ const T = {
         err_gdpr: "Bitte akzeptiere die Datenschutzerklärung, um fortzufahren.",
         err_fill: "Bitte fülle deine E-Mail und den Produktnamen aus.",
         err_network: "Netzwerkfehler. Bitte versuche es in einigen Sekunden erneut.",
-        err_limit: 'Du hast deine 3 kostenlosen Listings diese Woche genutzt. <a href="#" style="color:#f97316">Upgrade auf Pro — $19/Monat</a> für unbegrenzte Listings.',
+        err_limit: 'Du hast deine 3 kostenlosen Listings diese Woche genutzt. <a href="PACK_URL" style="color:#f97316">10 Listings kaufen — $4.99</a> oder <a href="UPGRADE_URL" style="color:#f97316">Pro werden — $19.99/Monat</a>',
         err_generic: "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
         remaining: (n) => n > 0 ? `✅ Listing erstellt! Du hast noch <strong style="color:#f97316">${n} kostenloses${n>1?' Listings':' Listing'}</strong> übrig.` : `Du hast alle kostenlosen Listings genutzt. <a href="#" style="color:#f97316">Upgrade auf Pro — $19/Monat</a>`
     },
@@ -378,7 +378,7 @@ const T = {
         err_gdpr: "Por favor aceite a Política de Privacidade para continuar.",
         err_fill: "Por favor preencha seu email e o nome do produto.",
         err_network: "Erro de rede. Tente novamente em alguns segundos.",
-        err_limit: 'Você usou suas 3 listagens gratuitas desta semana. <a href="#" style="color:#f97316">Upgrade para Pro — $19/mês</a> para listagens ilimitadas.',
+        err_limit: 'Você usou suas 3 listagens gratuitas desta semana. <a href="PACK_URL" style="color:#f97316">Comprar 10 listagens — $4.99</a> ou <a href="UPGRADE_URL" style="color:#f97316">Ir para Pro — $19.99/mês</a>',
         err_generic: "Algo deu errado. Tente novamente.",
         remaining: (n) => n > 0 ? `✅ Listagem gerada! Você tem <strong style="color:#f97316">${n} listagem${n>1?'s':''} gratuita${n>1?'s':''}</strong> restante${n>1?'s':''}.` : `Você usou todas as listagens gratuitas. <a href="#" style="color:#f97316">Upgrade para Pro — $19/mês</a>`
     }
@@ -449,7 +449,9 @@ async function generate() {
 
         if (data.error === 'free_limit') {
             const upgradeUrl = '/upgrade?email=' + encodeURIComponent(email);
-            showError(t.err_limit.replace('href="#"', 'href="' + upgradeUrl + '"'));
+            const packUrl = '/buy-pack?email=' + encodeURIComponent(email);
+            let msg = t.err_limit.replace('UPGRADE_URL', upgradeUrl).replace('PACK_URL', packUrl);
+            showError(msg);
             return;
         }
         if (!data.success) { showError(data.error || t.err_generic); return; }

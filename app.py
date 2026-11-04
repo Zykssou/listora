@@ -13,6 +13,7 @@ ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "").strip().lower()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "listora-admin-2026")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
+STRIPE_PACK_PRICE_ID = os.getenv("STRIPE_PACK_PRICE_ID", "")
 FREE_USES = 3
 
 def init_db():
@@ -26,7 +27,8 @@ def init_db():
             paid INTEGER DEFAULT 0,
             created_at TEXT,
             week_uses INTEGER DEFAULT 0,
-            week_key TEXT DEFAULT ''
+            week_key TEXT DEFAULT '',
+            credits INTEGER DEFAULT 0
         )
     """)
     c.execute("""
@@ -152,8 +154,9 @@ def generate():
         paid = user[3]
 
         week_uses = user[5] if len(user) > 5 else uses
+        credits = user[7] if len(user) > 7 else 0
         is_admin = ADMIN_EMAIL and email == ADMIN_EMAIL
-        if week_uses >= FREE_USES and not paid and not is_admin:
+        if week_uses >= FREE_USES and not paid and not is_admin and credits <= 0:
             return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
 
         result = generate_listing(product_name, category, features, target_audience, keywords)
@@ -167,6 +170,12 @@ def generate():
         conn.commit()
         conn.close()
 
+        if not paid and not is_admin and week_uses >= FREE_USES and credits > 0:
+            conn2 = sqlite3.connect(DB_PATH)
+            c2 = conn2.cursor()
+            c2.execute("UPDATE users SET credits = credits - 1 WHERE email=?", (email,))
+            conn2.commit()
+            conn2.close()
         remaining = max(0, FREE_USES - (week_uses + 1)) if not paid else 999
         return jsonify({"success": True, "listing": result, "remaining": remaining, "paid": paid})
     except Exception as e:
@@ -213,6 +222,52 @@ def upgrade():
         return redirect(session.url)
     except Exception as e:
         return f"Error: {str(e)}", 500
+
+@app.route("/buy-pack")
+def buy_pack():
+    email = request.args.get("email", "").strip().lower()
+    if not email or not STRIPE_SECRET_KEY or not STRIPE_PACK_PRICE_ID:
+        return redirect("/")
+    import stripe as stripe_lib
+    stripe_lib.api_key = STRIPE_SECRET_KEY
+    try:
+        session = stripe_lib.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            customer_email=email,
+            line_items=[{"price": STRIPE_PACK_PRICE_ID, "quantity": 1}],
+            success_url=request.host_url + "pack/success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=request.host_url,
+            metadata={"email": email}
+        )
+        return redirect(session.url)
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+
+@app.route("/pack/success")
+def pack_success():
+    session_id = request.args.get("session_id", "")
+    if session_id and STRIPE_SECRET_KEY:
+        import stripe as stripe_lib
+        stripe_lib.api_key = STRIPE_SECRET_KEY
+        try:
+            session = stripe_lib.checkout.Session.retrieve(session_id)
+            if session.payment_status == "paid":
+                email = (session.metadata.get("email") or session.customer_email or "").lower()
+                if email:
+                    conn = sqlite3.connect(DB_PATH)
+                    c = conn.cursor()
+                    c.execute("SELECT * FROM users WHERE email=?", (email,))
+                    if not c.fetchone():
+                        c.execute("INSERT INTO users (email, uses, paid, created_at, week_uses, week_key, credits) VALUES (?,0,0,?,0,?,10)",
+                                  (email, datetime.now().isoformat(), get_week_key()))
+                    else:
+                        c.execute("UPDATE users SET credits = credits + 10 WHERE email=?", (email,))
+                    conn.commit()
+                    conn.close()
+        except:
+            pass
+    return render_template("pack_success.html")
 
 @app.route("/upgrade/success")
 def upgrade_success():
