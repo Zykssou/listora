@@ -7,7 +7,7 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "listora-secret-2026")
 
-DB_PATH = "listora.db"
+DB_PATH = "/tmp/listora.db"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 FREE_USES = 3
 
@@ -34,6 +34,8 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+
+init_db()
 
 def get_or_create_user(email):
     conn = sqlite3.connect(DB_PATH)
@@ -127,14 +129,14 @@ def generate():
     if not email or not product_name:
         return jsonify({"error": "Email and product name are required"}), 400
 
-    user = get_or_create_user(email)
-    uses = user[2]
-    paid = user[3]
-
-    if uses >= FREE_USES and not paid:
-        return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
-
     try:
+        user = get_or_create_user(email)
+        uses = user[2]
+        paid = user[3]
+
+        if uses >= FREE_USES and not paid:
+            return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
+
         result = generate_listing(product_name, category, features, target_audience, keywords)
         increment_uses(email)
 
