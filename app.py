@@ -1,14 +1,14 @@
 from flask import Flask, render_template, request, jsonify, session
-import anthropic
+import google.generativeai as genai
 import os
 import sqlite3
 from datetime import datetime
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "listifyai-secret-2026")
+app.secret_key = os.getenv("SECRET_KEY", "listora-secret-2026")
 
-DB_PATH = "listifyai.db"
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+DB_PATH = "listora.db"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 FREE_USES = 3
 
 def init_db():
@@ -57,7 +57,9 @@ def increment_uses(email):
     conn.close()
 
 def generate_listing(product_name, category, features, target_audience, keywords):
-    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+
     prompt = f"""You are an expert Amazon listing copywriter. Generate a complete, optimized Amazon product listing for the following product.
 
 Product Name: {product_name}
@@ -66,7 +68,7 @@ Key Features: {features}
 Target Audience: {target_audience}
 Main Keywords: {keywords}
 
-Generate the following in JSON format:
+Generate the following in JSON format only, no extra text:
 {{
   "title": "Optimized Amazon title (max 200 characters, include main keywords)",
   "bullet_points": [
@@ -86,14 +88,9 @@ Rules:
 - Description: Tell a story, include social proof language, end with CTA
 - Keywords: Include variations, synonyms, related terms"""
 
-    message = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=2000,
-        messages=[{"role": "user", "content": prompt}]
-    )
-
+    response = model.generate_content(prompt)
     import json
-    text = message.content[0].text
+    text = response.text
     start = text.find("{")
     end = text.rfind("}") + 1
     return json.loads(text[start:end])
