@@ -87,12 +87,20 @@ Rules:
 - Description: Tell a story, include social proof language, end with CTA
 - Keywords: Include variations, synonyms, related terms"""
 
-    response = client.models.generate_content(model="gemini-flash-latest", contents=prompt)
-    import json
-    text = response.text
-    start = text.find("{")
-    end = text.rfind("}") + 1
-    return json.loads(text[start:end])
+    import json, time
+    models_to_try = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-pro-latest"]
+    last_error = None
+    for model_name in models_to_try:
+        try:
+            response = client.models.generate_content(model=model_name, contents=prompt)
+            text = response.text
+            start = text.find("{")
+            end = text.rfind("}") + 1
+            return json.loads(text[start:end])
+        except Exception as e:
+            last_error = e
+            time.sleep(1)
+    raise last_error
 
 @app.route("/")
 def index():
@@ -141,8 +149,14 @@ def test_api():
         return jsonify({"error": "GEMINI_API_KEY not set"}), 500
     try:
         client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_content(model="gemini-flash-latest", contents="Say hello in one word")
-        return jsonify({"ok": True, "response": response.text})
+        models_to_try = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-pro-latest"]
+        for model_name in models_to_try:
+            try:
+                response = client.models.generate_content(model=model_name, contents="Say hello in one word")
+                return jsonify({"ok": True, "model": model_name, "response": response.text})
+            except Exception:
+                continue
+        return jsonify({"error": "All models unavailable"}), 503
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
