@@ -1,14 +1,15 @@
 from flask import Flask, render_template, request, jsonify, session, redirect
 import requests as http_requests
 import os
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import secrets
 from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "listora-secret-2026")
 
-DB_PATH = "/tmp/listora.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "").strip().lower()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "listora-admin-2026")
@@ -18,12 +19,15 @@ STRIPE_PACK_PRICE_ID = os.getenv("STRIPE_PACK_PRICE_ID", "")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 FREE_USES = 3
 
+def get_conn():
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
+
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             email TEXT UNIQUE,
             uses INTEGER DEFAULT 0,
             paid INTEGER DEFAULT 0,
@@ -37,7 +41,7 @@ def init_db():
     """)
     c.execute("""
         CREATE TABLE IF NOT EXISTS listings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             email TEXT,
             product_name TEXT,
             result TEXT,
@@ -45,18 +49,6 @@ def init_db():
         )
     """)
     conn.commit()
-    for col, definition in [
-        ("week_uses", "INTEGER DEFAULT 0"),
-        ("week_key", "TEXT DEFAULT ''"),
-        ("credits", "INTEGER DEFAULT 0"),
-        ("verified", "INTEGER DEFAULT 0"),
-        ("verify_token", "TEXT DEFAULT ''")
-    ]:
-        try:
-            c.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
-            conn.commit()
-        except Exception:
-            pass
     conn.close()
 
 init_db()
@@ -87,30 +79,30 @@ def get_week_key():
     return f"{now.year}-W{now.isocalendar()[1]}"
 
 def get_or_create_user(email):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
     week_key = get_week_key()
-    c.execute("SELECT * FROM users WHERE email=?", (email,))
+    c.execute("SELECT * FROM users WHERE email=%s", (email,))
     user = c.fetchone()
     if not user:
-        c.execute("INSERT INTO users (email, uses, paid, created_at, week_uses, week_key) VALUES (?,0,0,?,0,?)",
+        c.execute("INSERT INTO users (email, uses, paid, created_at, week_uses, week_key) VALUES (%s,0,0,%s,0,%s)",
                   (email, datetime.now().isoformat(), week_key))
         conn.commit()
-        c.execute("SELECT * FROM users WHERE email=?", (email,))
+        c.execute("SELECT * FROM users WHERE email=%s", (email,))
         user = c.fetchone()
     else:
         if user[6] != week_key:
-            c.execute("UPDATE users SET week_uses=0, week_key=? WHERE email=?", (week_key, email))
+            c.execute("UPDATE users SET week_uses=0, week_key=%s WHERE email=%s", (week_key, email))
             conn.commit()
-            c.execute("SELECT * FROM users WHERE email=?", (email,))
+            c.execute("SELECT * FROM users WHERE email=%s", (email,))
             user = c.fetchone()
     conn.close()
     return user
 
 def increment_uses(email):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("UPDATE users SET uses = uses + 1, week_uses = week_uses + 1 WHERE email=?", (email,))
+    c.execute("UPDATE users SET uses = uses + 1, week_uses = week_uses + 1 WHERE email=%s", (email,))
     conn.commit()
     conn.close()
 
@@ -214,28 +206,44 @@ def generate():
         verified = user[8] if len(user) > 8 else 0
         is_admin = ADMIN_EMAIL and email == ADMIN_EMAIL
 
+        if not verified and not is_admin:
+            token = secrets.token_urlsafe(32)
+            conn2 = get_conn()
+            c2 = conn2.cursor()
+            c2.execute("UPDATE users SET verify_token=%s WHERE email=%s", (token, email))
+            conn2.commit()
+            conn2.close()
+            resend_error = None
+            try:
+                r = send_verification_email(email, token, request.host_url)
+                if r and r.status_code != 200:
+                    resend_error = r.text
+            except Exception as ex:
+                resend_error = str(ex)
+            return jsonify({"error": "email_not_verified", "resend_debug": resend_error, "message": "Check your inbox to verify your email."}), 403
+
         if week_uses >= FREE_USES and not paid and not is_admin and credits <= 0:
             return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
 
         result = generate_listing(product_name, category, features, target_audience, keywords, language)
         increment_uses(email)
 
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_conn()
         c = conn.cursor()
         import json
-        c.execute("INSERT INTO listings (email, product_name, result, created_at) VALUES (?,?,?,?)",
+        c.execute("INSERT INTO listings (email, product_name, result, created_at) VALUES (%s,%s,%s,%s)",
                   (email, product_name, json.dumps(result), datetime.now().isoformat()))
         conn.commit()
         conn.close()
 
         if not paid and not is_admin and week_uses >= FREE_USES and credits > 0:
-            conn2 = sqlite3.connect(DB_PATH)
+            conn2 = get_conn()
             c2 = conn2.cursor()
-            c2.execute("UPDATE users SET credits = credits - 1 WHERE email=?", (email,))
+            c2.execute("UPDATE users SET credits = credits - 1 WHERE email=%s", (email,))
             conn2.commit()
             conn2.close()
         remaining = max(0, FREE_USES - (week_uses + 1)) if not paid else 999
-        return jsonify({"success": True, "listing": result, "remaining": remaining, "paid": paid})
+        return jsonify({"success": True, "listing": result, "remaining": remaining, "paid": bool(paid)})
     except Exception as e:
         import traceback
         return jsonify({"error": str(e), "detail": traceback.format_exc()}), 500
@@ -270,7 +278,7 @@ def test_api():
 
 @app.route("/api/stats")
 def stats():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM users")
     users = c.fetchone()[0]
@@ -332,14 +340,14 @@ def pack_success():
             if session.payment_status == "paid":
                 email = (session.metadata.get("email") or session.customer_email or "").lower()
                 if email:
-                    conn = sqlite3.connect(DB_PATH)
+                    conn = get_conn()
                     c = conn.cursor()
-                    c.execute("SELECT * FROM users WHERE email=?", (email,))
+                    c.execute("SELECT id FROM users WHERE email=%s", (email,))
                     if not c.fetchone():
-                        c.execute("INSERT INTO users (email, uses, paid, created_at, week_uses, week_key, credits) VALUES (?,0,0,?,0,?,10)",
+                        c.execute("INSERT INTO users (email, uses, paid, created_at, week_uses, week_key, credits) VALUES (%s,0,0,%s,0,%s,3)",
                                   (email, datetime.now().isoformat(), get_week_key()))
                     else:
-                        c.execute("UPDATE users SET credits = credits + 3 WHERE email=?", (email,))
+                        c.execute("UPDATE users SET credits = credits + 3 WHERE email=%s", (email,))
                     conn.commit()
                     conn.close()
         except:
@@ -357,13 +365,13 @@ def upgrade_success():
             if session.payment_status == "paid":
                 email = (session.metadata.get("email") or session.customer_email or "").lower()
                 if email:
-                    conn = sqlite3.connect(DB_PATH)
+                    conn = get_conn()
                     c = conn.cursor()
-                    c.execute("SELECT * FROM users WHERE email=?", (email,))
+                    c.execute("SELECT id FROM users WHERE email=%s", (email,))
                     if not c.fetchone():
-                        c.execute("INSERT INTO users (email, uses, paid, created_at) VALUES (?,0,1,?)", (email, datetime.now().isoformat()))
+                        c.execute("INSERT INTO users (email, uses, paid, created_at) VALUES (%s,0,1,%s)", (email, datetime.now().isoformat()))
                     else:
-                        c.execute("UPDATE users SET paid=1 WHERE email=?", (email,))
+                        c.execute("UPDATE users SET paid=1 WHERE email=%s", (email,))
                     conn.commit()
                     conn.close()
         except:
@@ -372,12 +380,12 @@ def upgrade_success():
 
 @app.route("/verify/<token>")
 def verify_email(token):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT email FROM users WHERE verify_token=?", (token,))
+    c.execute("SELECT email FROM users WHERE verify_token=%s", (token,))
     row = c.fetchone()
     if row:
-        c.execute("UPDATE users SET verified=1, verify_token='' WHERE verify_token=?", (token,))
+        c.execute("UPDATE users SET verified=1, verify_token='' WHERE verify_token=%s", (token,))
         conn.commit()
     conn.close()
     return render_template("verified.html", success=bool(row))
@@ -391,7 +399,7 @@ def admin():
     pwd = request.args.get("pwd", "")
     if pwd != ADMIN_PASSWORD:
         return render_template("admin_login.html")
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM users")
     total_users = c.fetchone()[0]
