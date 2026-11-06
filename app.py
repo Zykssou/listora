@@ -116,29 +116,25 @@ def increment_uses(email):
 
 def call_gemini(prompt):
     import json, time
-    models_to_try = ["gemini-3.8-flash", "gemini-3.8-flash-001"]
-    last_error = ""
-    for model_name in models_to_try:
-        for api_version in ["v1beta", "v1"]:
-            url = f"https://generativelanguage.googleapis.com/{api_version}/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
-            body = {"contents": [{"parts": [{"text": prompt}]}]}
-            try:
-                r = http_requests.post(url, json=body, timeout=25)
-                if r.status_code == 503:
-                    time.sleep(1)
-                    continue
-                if r.status_code == 429:
-                    last_error = "quota"
-                    continue
-                r.raise_for_status()
-                text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-                return text, model_name
-            except Exception as e:
-                last_error = str(e)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={GEMINI_API_KEY}"
+    body = {"contents": [{"parts": [{"text": prompt}]}]}
+    for attempt in range(6):
+        try:
+            r = http_requests.post(url, json=body, timeout=20)
+            if r.status_code == 503:
+                time.sleep(2)
                 continue
-    if "quota" in last_error:
-        raise Exception("Quota API dépassé. Réessaie dans quelques heures.")
-    raise Exception("Le service IA est temporairement indisponible. Réessaie dans 1 minute.")
+            if r.status_code == 429:
+                raise Exception("Quota API dépassé. Réessaie dans quelques heures.")
+            r.raise_for_status()
+            text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return text, "gemini-3.8-flash"
+        except Exception as e:
+            if "Quota" in str(e):
+                raise
+            time.sleep(2)
+            continue
+    raise Exception("Le service IA est surchargé. Réessaie dans 1 minute.")
 
 def generate_listing(product_name, category, features, target_audience, keywords, language="en"):
     lang_map = {"fr": "French", "es": "Spanish", "de": "German", "pt": "Portuguese", "en": "English"}
