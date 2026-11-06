@@ -118,11 +118,11 @@ def call_gemini(prompt):
     import json, time
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={GEMINI_API_KEY}"
     body = {"contents": [{"parts": [{"text": prompt}]}]}
-    for attempt in range(4):
+    for attempt in range(8):
         try:
-            r = http_requests.post(url, json=body, timeout=10)
+            r = http_requests.post(url, json=body, timeout=8)
             if r.status_code == 503:
-                time.sleep(3)
+                time.sleep(2)
                 continue
             if r.status_code == 429:
                 raise Exception("Quota API dépassé. Réessaie dans quelques heures.")
@@ -132,7 +132,7 @@ def call_gemini(prompt):
         except Exception as e:
             if "Quota" in str(e):
                 raise
-            time.sleep(3)
+            time.sleep(2)
             continue
     raise Exception("Le service IA est surchargé. Réessaie dans 1 minute.")
 
