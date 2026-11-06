@@ -18,6 +18,8 @@ STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "")
 STRIPE_PACK_PRICE_ID = os.getenv("STRIPE_PACK_PRICE_ID", "")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 FREE_USES = 3
+GEMINI_INPUT_COST = 0.075 / 1_000_000
+GEMINI_OUTPUT_COST = 0.30 / 1_000_000
 
 def get_conn():
     return psycopg2.connect(DATABASE_URL, sslmode='require')
@@ -45,9 +47,26 @@ def init_db():
             email TEXT,
             product_name TEXT,
             result TEXT,
-            created_at TEXT
+            created_at TEXT,
+            model_used TEXT DEFAULT '',
+            tokens_in INTEGER DEFAULT 0,
+            tokens_out INTEGER DEFAULT 0,
+            cost_usd REAL DEFAULT 0,
+            quality_score INTEGER DEFAULT 0
         )
     """)
+    for col, definition in [
+        ("model_used", "TEXT DEFAULT ''"),
+        ("tokens_in", "INTEGER DEFAULT 0"),
+        ("tokens_out", "INTEGER DEFAULT 0"),
+        ("cost_usd", "REAL DEFAULT 0"),
+        ("quality_score", "INTEGER DEFAULT 0"),
+    ]:
+        try:
+            c.execute(f"ALTER TABLE listings ADD COLUMN {col} {definition}")
+            conn.commit()
+        except Exception:
+            conn.rollback()
     conn.commit()
     conn.close()
 
@@ -123,14 +142,33 @@ def call_gemini(prompt):
                 if r.status_code == 404:
                     break
                 r.raise_for_status()
-                text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-                return text, model
+                data = r.json()
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                usage = data.get("usageMetadata", {})
+                tokens_in = usage.get("promptTokenCount", 0)
+                tokens_out = usage.get("candidatesTokenCount", 0)
+                return text, model, tokens_in, tokens_out
             except Exception as e:
                 if "Quota" in str(e):
                     raise
                 time.sleep(1)
                 continue
     raise Exception("Le service IA est surchargé. Réessaie dans 1 minute.")
+
+def calc_cost(tokens_in, tokens_out):
+    return round(tokens_in * GEMINI_INPUT_COST + tokens_out * GEMINI_OUTPUT_COST, 6)
+
+def quality_score(listing):
+    score = 0
+    if listing.get("title") and len(listing["title"]) > 50:
+        score += 25
+    if listing.get("bullet_points") and len(listing["bullet_points"]) >= 5:
+        score += 25
+    if listing.get("description") and len(listing["description"].split()) >= 150:
+        score += 25
+    if listing.get("backend_keywords") and len(listing["backend_keywords"]) > 50:
+        score += 25
+    return score
 
 def generate_listing(product_name, category, features, target_audience, keywords, language="en"):
     lang_map = {"fr": "French", "es": "Spanish", "de": "German", "pt": "Portuguese", "en": "English"}
@@ -164,10 +202,11 @@ Rules:
 - Keywords: Include variations, synonyms, related terms"""
 
     import json
-    text, _ = call_gemini(prompt)
+    text, model, tokens_in, tokens_out = call_gemini(prompt)
     start = text.find("{")
     end = text.rfind("}") + 1
-    return json.loads(text[start:end])
+    result = json.loads(text[start:end])
+    return result, model, tokens_in, tokens_out
 
 @app.errorhandler(500)
 def handle_500(e):
@@ -225,14 +264,18 @@ def generate():
         if week_uses >= FREE_USES and not paid and not is_admin and credits <= 0:
             return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
 
-        result = generate_listing(product_name, category, features, target_audience, keywords, language)
+        result, model_used, tokens_in, tokens_out = generate_listing(product_name, category, features, target_audience, keywords, language)
+        cost = calc_cost(tokens_in, tokens_out)
+        score = quality_score(result)
         increment_uses(email)
 
         conn = get_conn()
         c = conn.cursor()
         import json
-        c.execute("INSERT INTO listings (email, product_name, result, created_at) VALUES (%s,%s,%s,%s)",
-                  (email, product_name, json.dumps(result), datetime.now().isoformat()))
+        c.execute(
+            "INSERT INTO listings (email, product_name, result, created_at, model_used, tokens_in, tokens_out, cost_usd, quality_score) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            (email, product_name, json.dumps(result), datetime.now().isoformat(), model_used, tokens_in, tokens_out, cost, score)
+        )
         conn.commit()
         conn.close()
 
@@ -407,10 +450,16 @@ def admin():
     total_listings = c.fetchone()[0]
     c.execute("SELECT email, uses, paid, created_at FROM users ORDER BY created_at DESC LIMIT 50")
     users = c.fetchall()
-    c.execute("SELECT email, product_name, created_at FROM listings ORDER BY created_at DESC LIMIT 20")
+    c.execute("SELECT email, product_name, created_at, model_used, cost_usd, quality_score FROM listings ORDER BY created_at DESC LIMIT 20")
     recent = c.fetchall()
+    c.execute("SELECT COALESCE(SUM(cost_usd), 0) FROM listings")
+    total_cost = round(c.fetchone()[0], 4)
+    c.execute("SELECT COALESCE(AVG(quality_score), 0) FROM listings WHERE quality_score > 0")
+    avg_quality = round(c.fetchone()[0], 1)
+    c.execute("SELECT model_used, COUNT(*) FROM listings WHERE model_used != '' GROUP BY model_used ORDER BY COUNT(*) DESC")
+    model_stats = c.fetchall()
     conn.close()
-    return render_template("admin.html", total_users=total_users, total_listings=total_listings, users=users, recent=recent)
+    return render_template("admin.html", total_users=total_users, total_listings=total_listings, users=users, recent=recent, total_cost=total_cost, avg_quality=avg_quality, model_stats=model_stats)
 
 if __name__ == "__main__":
     init_db()
