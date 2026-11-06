@@ -339,7 +339,7 @@ def pack_success():
                         c.execute("INSERT INTO users (email, uses, paid, created_at, week_uses, week_key, credits) VALUES (?,0,0,?,0,?,10)",
                                   (email, datetime.now().isoformat(), get_week_key()))
                     else:
-                        c.execute("UPDATE users SET credits = credits + 10 WHERE email=?", (email,))
+                        c.execute("UPDATE users SET credits = credits + 3 WHERE email=?", (email,))
                     conn.commit()
                     conn.close()
         except:
