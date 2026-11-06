@@ -210,22 +210,6 @@ def generate():
         verified = user[8] if len(user) > 8 else 0
         is_admin = ADMIN_EMAIL and email == ADMIN_EMAIL
 
-        if not verified and not is_admin:
-            token = secrets.token_urlsafe(32)
-            conn2 = sqlite3.connect(DB_PATH)
-            c2 = conn2.cursor()
-            c2.execute("UPDATE users SET verify_token=? WHERE email=?", (token, email))
-            conn2.commit()
-            conn2.close()
-            resend_error = None
-            try:
-                r = send_verification_email(email, token, request.host_url)
-                if r and r.status_code != 200:
-                    resend_error = r.text
-            except Exception as ex:
-                resend_error = str(ex)
-            return jsonify({"error": "email_not_verified", "resend_debug": resend_error, "message": "Check your inbox to verify your email."}), 403
-
         if week_uses >= FREE_USES and not paid and not is_admin and credits <= 0:
             return jsonify({"error": "free_limit", "message": "You've used your 3 free listings. Upgrade to Pro for unlimited listings."}), 403
 
