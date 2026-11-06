@@ -475,7 +475,13 @@ async function generate() {
         document.getElementById('kw-text').textContent = l.backend_keywords;
 
         const rem = data.remaining;
-        document.getElementById('remaining-msg').innerHTML = t.remaining(rem);
+        if (rem === 0) {
+            const upgradeUrl = '/upgrade?email=' + encodeURIComponent(email);
+            const packUrl = '/buy-pack?email=' + encodeURIComponent(email);
+            document.getElementById('remaining-msg').innerHTML = t.err_limit.replace('UPGRADE_URL', upgradeUrl).replace('PACK_URL', packUrl);
+        } else {
+            document.getElementById('remaining-msg').innerHTML = t.remaining(rem);
+        }
 
         document.getElementById('result').style.display = 'block';
         document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
