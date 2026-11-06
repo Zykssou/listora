@@ -116,24 +116,28 @@ def increment_uses(email):
 
 def call_gemini(prompt):
     import json, time
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={GEMINI_API_KEY}"
+    models = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash", "gemini-flash-latest"]
     body = {"contents": [{"parts": [{"text": prompt}]}]}
-    for attempt in range(8):
-        try:
-            r = http_requests.post(url, json=body, timeout=8)
-            if r.status_code == 503:
-                time.sleep(2)
+    for model in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        for attempt in range(3):
+            try:
+                r = http_requests.post(url, json=body, timeout=20)
+                if r.status_code == 503:
+                    time.sleep(2)
+                    continue
+                if r.status_code == 429:
+                    raise Exception("Quota API dépassé. Réessaie dans quelques heures.")
+                if r.status_code == 404:
+                    break
+                r.raise_for_status()
+                text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                return text, model
+            except Exception as e:
+                if "Quota" in str(e):
+                    raise
+                time.sleep(1)
                 continue
-            if r.status_code == 429:
-                raise Exception("Quota API dépassé. Réessaie dans quelques heures.")
-            r.raise_for_status()
-            text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-            return text, "gemini-3.8-flash"
-        except Exception as e:
-            if "Quota" in str(e):
-                raise
-            time.sleep(2)
-            continue
     raise Exception("Le service IA est surchargé. Réessaie dans 1 minute.")
 
 def generate_listing(product_name, category, features, target_audience, keywords, language="en"):
