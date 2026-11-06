@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, jsonify, session, redirect
 import requests as http_requests
 import os
-import psycopg2
-import psycopg2.extras
+import pg8000.dbapi
+from urllib.parse import urlparse
 import secrets
 from datetime import datetime
 
@@ -20,7 +20,15 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 FREE_USES = 3
 
 def get_conn():
-    return psycopg2.connect(DATABASE_URL, sslmode="require")
+    url = urlparse(DATABASE_URL)
+    return pg8000.dbapi.connect(
+        host=url.hostname,
+        user=url.username,
+        password=url.password,
+        database=url.path[1:],
+        port=url.port or 5432,
+        ssl_context=True
+    )
 
 def init_db():
     conn = get_conn()
