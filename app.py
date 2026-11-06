@@ -256,15 +256,13 @@ def test_resend():
 def test_api():
     if not GEMINI_API_KEY:
         return jsonify({"error": "GEMINI_API_KEY not set"}), 500
-    results = {}
-    for model_name in ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash"]:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
-        try:
-            r = http_requests.post(url, json={"contents": [{"parts": [{"text": "Say hello"}]}]}, timeout=15)
-            results[model_name] = {"status": r.status_code, "body": r.json()}
-        except Exception as e:
-            results[model_name] = {"error": str(e)}
-    return jsonify(results)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+    try:
+        r = http_requests.get(url, timeout=15)
+        models = [m["name"] for m in r.json().get("models", [])]
+        return jsonify({"models": models})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/stats")
 def stats():
